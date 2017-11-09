@@ -72,6 +72,6 @@ def run():
 
 
 if __name__ == '__main__':
-    log.debug(', '.join([f'{k}={v}' for k, v in config.items()]))
+    log.debug(', '.join(['{k}={v}'.format(k=k, v=v) for k, v in config.items()]))
     log.info('Running')
     run()
