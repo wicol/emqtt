@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 import os
-import time
 import asyncore
 import logging
-from datetime import datetime
 from smtpd import SMTPServer
 
 from paho.mqtt import publish
