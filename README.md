@@ -26,6 +26,7 @@ I made a docker image because like any hipster dev I like docker. At least it's 
    * MQTT_PAYLOAD=ON
    * MQTT_RESET_TIME=300
    * MQTT_RESET_PAYLOAD=OFF
+   * SAVE_ATTACHMENTS=True
    * DEBUG=False
 
 1. Go.
@@ -47,6 +48,7 @@ $ docker run -d \
     -e "DEBUG=True" \
     -v /etc/localtime:/etc/localtime:ro \
     -v $PWD/log:/emqtt/log \
+    -v $PWD/attachments:/emqtt/attachments \
     emqtt
 ```
 

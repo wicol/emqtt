@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import os
 import time
+import email
+from email.policy import default
 import asyncio
 import logging
 from datetime import datetime
@@ -19,12 +21,17 @@ defaults = {
     'MQTT_PAYLOAD': 'ON',
     'MQTT_RESET_TIME': '300',
     'MQTT_RESET_PAYLOAD': 'OFF',
-    'DEBUG': False
+    'SAVE_ATTACHMENTS': 'True',
+    'DEBUG': 'False'
 }
 config = {
     setting: os.environ.get(setting, default)
     for setting, default in defaults.items()
 }
+# Boolify
+config['DEBUG'] = config['DEBUG'] == 'True'
+config['SAVE_ATTACHMENTS'] = config['SAVE_ATTACHMENTS'] == 'True'
+
 level = logging.DEBUG if config['DEBUG'] == 'True' else logging.INFO
 
 log = logging.getLogger('emqtt')
@@ -45,13 +52,27 @@ class EMQTTHandler:
 
     async def handle_DATA(self, server, session, envelope):
         log.debug('Message from %s', envelope.mail_from)
+        msg = email.message_from_bytes(envelope.original_content, policy=default)
+
+        if config['SAVE_ATTACHMENTS']:
+            for att in msg.iter_attachments():
+                # Just save images
+                if not att.get_content_type().startswith('image'):
+                    continue
+                filename = att.get_filename()
+                image_data = att.get_content()
+                file_path = os.path.join('attachments', filename)
+                log.info('Saving attached file %s to %s', filename, file_path)
+                with open(file_path, 'wb') as f:
+                    f.write(image_data)
+
         log.debug(
             'Message data (truncated): %s',
             envelope.content.decode('utf8', errors='replace')[:250]
         )
         topic = '{}/{}'.format(config['MQTT_TOPIC'], envelope.mail_from.replace('@', ''))
         self.mqtt_publish(topic, config['MQTT_PAYLOAD'])
-        
+
         if self.reset_time:
             self.handles[topic] = self.loop.call_later(
                 self.reset_time,
@@ -65,7 +86,7 @@ class EMQTTHandler:
         # Cancel any current scheduled resets of this topic
         if topic in self.handles:
             self.handles.pop(topic).cancel()
-        
+
         log.info('Publishing "%s" to %s', payload, topic)
         try:
             publish.single(
@@ -103,4 +124,3 @@ if __name__ == '__main__':
     except:
         c.stop()
         raise
-
