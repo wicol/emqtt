@@ -10,6 +10,8 @@ It's based on aiosmtpd and paho-mqtt.
 
 I made a docker image because like any hipster dev I like docker. At least it's based on alpine so there's that.
 
+Protip: `docker exec emqtt find attachments -type f -ctime +20 -delete`
+
 ## Run it
 
 1. Create venv and activate it. Or don't.
@@ -27,6 +29,7 @@ I made a docker image because like any hipster dev I like docker. At least it's 
    * MQTT_RESET_TIME=300
    * MQTT_RESET_PAYLOAD=OFF
    * SAVE_ATTACHMENTS=True
+   * SAVE_ATTACHMENTS_DURING_RESET_TIME=False
    * DEBUG=False
 
 1. Go.

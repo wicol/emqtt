@@ -22,6 +22,7 @@ defaults = {
     'MQTT_RESET_TIME': '300',
     'MQTT_RESET_PAYLOAD': 'OFF',
     'SAVE_ATTACHMENTS': 'True',
+    'SAVE_ATTACHMENTS_DURING_RESET_TIME': 'False',
     'DEBUG': 'False'
 }
 config = {
@@ -29,8 +30,11 @@ config = {
     for setting, default in defaults.items()
 }
 # Boolify
-config['DEBUG'] = config['DEBUG'] == 'True'
-config['SAVE_ATTACHMENTS'] = config['SAVE_ATTACHMENTS'] == 'True'
+for key, value in config.items():
+    if value == 'True':
+        config[key] = True
+    elif value == 'False':
+        config[key] = False
 
 level = logging.DEBUG if config['DEBUG'] == 'True' else logging.INFO
 
@@ -53,8 +57,18 @@ class EMQTTHandler:
     async def handle_DATA(self, server, session, envelope):
         log.debug('Message from %s', envelope.mail_from)
         msg = email.message_from_bytes(envelope.original_content, policy=default)
+        log.debug(
+            'Message data (truncated): %s',
+            envelope.content.decode('utf8', errors='replace')[:250]
+        )
+        topic = '{}/{}'.format(config['MQTT_TOPIC'], envelope.mail_from.replace('@', ''))
+        self.mqtt_publish(topic, config['MQTT_PAYLOAD'])
 
-        if config['SAVE_ATTACHMENTS']:
+        # Save attached files if configured to do so.
+        if config['SAVE_ATTACHMENTS'] and (
+                # Don't save them during reset time unless configured to do so.
+                topic not in self.handles
+                or config['SAVE_ATTACHMENTS_DURING_RESET_TIME']):
             for att in msg.iter_attachments():
                 # Just save images
                 if not att.get_content_type().startswith('image'):
@@ -66,14 +80,12 @@ class EMQTTHandler:
                 with open(file_path, 'wb') as f:
                     f.write(image_data)
 
-        log.debug(
-            'Message data (truncated): %s',
-            envelope.content.decode('utf8', errors='replace')[:250]
-        )
-        topic = '{}/{}'.format(config['MQTT_TOPIC'], envelope.mail_from.replace('@', ''))
-        self.mqtt_publish(topic, config['MQTT_PAYLOAD'])
+        # Cancel any current scheduled resets of this topic
+        if topic in self.handles:
+            self.handles.pop(topic).cancel()
 
         if self.reset_time:
+            # Schedule a reset of this topic
             self.handles[topic] = self.loop.call_later(
                 self.reset_time,
                 self.mqtt_publish,
@@ -83,10 +95,6 @@ class EMQTTHandler:
         return '250 Message accepted for delivery'
 
     def mqtt_publish(self, topic, payload):
-        # Cancel any current scheduled resets of this topic
-        if topic in self.handles:
-            self.handles.pop(topic).cancel()
-
         log.info('Publishing "%s" to %s', payload, topic)
         try:
             publish.single(
