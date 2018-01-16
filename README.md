@@ -16,7 +16,7 @@ Protip: `docker exec emqtt find attachments -type f -ctime +20 -delete`
 
 1. Create venv and activate it. Or don't.
 
-1. `pip install -r requirements.pip`.
+1. `pip install -r requirements.txt`.
 
 1. Give it some env vars. These are the defaults so omit whatever looks good.
    * SMTP_PORT=1025
