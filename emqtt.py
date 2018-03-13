@@ -36,7 +36,7 @@ for key, value in config.items():
     elif value == 'False':
         config[key] = False
 
-level = logging.DEBUG if config['DEBUG'] == 'True' else logging.INFO
+level = logging.DEBUG if config['DEBUG'] else logging.INFO
 
 log = logging.getLogger('emqtt')
 log.setLevel(level)
