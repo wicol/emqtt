@@ -1,7 +1,6 @@
-FROM python:3.6-alpine
-COPY emqtt.py /emqtt/emqtt.py
-COPY requirements.txt /emqtt/requirements.txt
-RUN pip install -r /emqtt/requirements.txt
-EXPOSE 1025
+FROM alpine:latest
 WORKDIR /emqtt
-CMD ["python", "emqtt.py"]
+COPY emqtt.py requirements.txt ./
+RUN apk add --no-cache python3 && pip3 install -r requirements.txt
+EXPOSE 1025
+CMD ["python3", "emqtt.py"]
