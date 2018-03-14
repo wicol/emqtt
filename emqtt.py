@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-import os
-import time
-import email
-from email.policy import default
 import asyncio
+import email
 import logging
+import os
+import signal
+import time
 from datetime import datetime
+from email.policy import default
 
 from aiosmtpd.controller import Controller
 from paho.mqtt import publish
@@ -53,6 +54,11 @@ class EMQTTHandler:
         self.loop = loop
         self.reset_time = int(config['MQTT_RESET_TIME'])
         self.handles = {}
+        self.quit = False
+        signal.signal(signal.SIGTERM, self.set_quit)
+        signal.signal(signal.SIGINT, self.set_quit)
+        if config['SAVE_ATTACHMENTS']:
+            log.info('Configured to save attachments')
 
     async def handle_DATA(self, server, session, envelope):
         log.debug('Message from %s', envelope.mail_from)
@@ -69,6 +75,13 @@ class EMQTTHandler:
                 # Don't save them during reset time unless configured to do so.
                 topic not in self.handles
                 or config['SAVE_ATTACHMENTS_DURING_RESET_TIME']):
+            log.debug(
+                'Saving attachments. Topic "%s" aldready triggered: %s, '
+                'Save attachment override: %s',
+                    topic,
+                    topic in self.handles,
+                    config['SAVE_ATTACHMENTS_DURING_RESET_TIME']
+            )
             for att in msg.iter_attachments():
                 # Just save images
                 if not att.get_content_type().startswith('image'):
@@ -79,6 +92,9 @@ class EMQTTHandler:
                 log.info('Saving attached file %s to %s', filename, file_path)
                 with open(file_path, 'wb') as f:
                     f.write(image_data)
+        else:
+            log.debug('Not saving attachments')
+            log.debug(self.handles)
 
         # Cancel any current scheduled resets of this topic
         if topic in self.handles:
@@ -88,9 +104,8 @@ class EMQTTHandler:
             # Schedule a reset of this topic
             self.handles[topic] = self.loop.call_later(
                 self.reset_time,
-                self.mqtt_publish,
-                topic,
-                config['MQTT_RESET_PAYLOAD']
+                self.reset,
+                topic
             )
         return '250 Message accepted for delivery'
 
@@ -110,6 +125,15 @@ class EMQTTHandler:
         except Exception as e:
             log.exception('Failed publishing')
 
+    def reset(self, topic):
+        log.info(f'Resetting topic {topic}')
+        self.handles.pop(topic)
+        self.mqtt_publish(topic, config['MQTT_RESET_PAYLOAD'])
+
+    def set_quit(self, *args):
+        log.info('Quitting...')
+        self.quit = True
+
 
 if __name__ == '__main__':
     log.debug(', '.join([f'{k}={v}' for k, v in config.items()]))
@@ -122,13 +146,13 @@ if __name__ == '__main__':
         log.addHandler(fh)
 
     loop = asyncio.get_event_loop()
-
     c = Controller(EMQTTHandler(loop), loop, '0.0.0.0', config['SMTP_PORT'])
     c.start()
     log.info('Running')
     try:
-        while True:
-            time.sleep(1)
+        while not c.handler.quit:
+            time.sleep(0.5)
+        c.stop()
     except:
         c.stop()
         raise
