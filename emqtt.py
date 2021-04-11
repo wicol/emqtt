@@ -146,7 +146,7 @@ if __name__ == '__main__':
         log.addHandler(fh)
 
     loop = asyncio.get_event_loop()
-    c = Controller(EMQTTHandler(loop), loop, '0.0.0.0', config['SMTP_PORT'])
+    c = Controller(handler=EMQTTHandler(loop), loop=loop, hostname='0.0.0.0', port=config['SMTP_PORT'])
     c.start()
     log.info('Running')
     try:
