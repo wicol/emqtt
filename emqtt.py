@@ -116,7 +116,7 @@ class EMQTTHandler:
                 topic,
                 payload,
                 hostname=config['MQTT_HOST'],
-                port=config['MQTT_PORT'],
+                port=int(config['MQTT_PORT']),
                 auth={
                     'username': config['MQTT_USERNAME'],
                     'password': config['MQTT_PASSWORD']
